@@ -20,34 +20,31 @@ namespace PassantsForecasting
     {
         static void Main(string[] args)
         {
-            var currentCulture = new CultureInfo("fr-FR");
-            var weekNo = currentCulture.Calendar.GetWeekOfYear(
-                            DateTime.Now,
-                            currentCulture.DateTimeFormat.CalendarWeekRule,
-                            currentCulture.DateTimeFormat.FirstDayOfWeek);
-
             MLContext _mlContext = new MLContext();
 
             string ConnectionString = "Data Source=146.59.229.11;Initial Catalog=Workshop;User ID=admin;Password=EPSIworkshop2020*";
             string rootDir = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "../../../"));
             string modelPath = Path.Combine(rootDir, "Data", "MLModel.zip");
 
-            string query = "SELECT CAST(e.numWeek as REAL) AS Semaine, CAST(e.jour as REAL) AS Jour, f.matricule AS Feu, CAST(SUM(e.nbPassant) as REAL) as NbPassants FROM etat e INNER JOIN feu f ON e.idFeu = f.idFeu GROUP BY e.numWeek, e.jour, f.matricule";
+            string query = "SELECT f.matricule AS Feu, CAST(e.nbPassant as REAL) AS NbPassants, CAST(e.jour as REAL) AS Jour, CAST(e.numWeek as REAL) as Semaine " +
+                "FROM etat e " +
+                "INNER JOIN feu f ON e.idFeu = f.idFeu " +
+                "WHERE e.idFeu = 17 AND e.numWeek = 47";
 
             DatabaseLoader loader = _mlContext.Data.CreateDatabaseLoader<ModelInput>();
             DatabaseSource databaseSource = new DatabaseSource(SqlClientFactory.Instance, ConnectionString, query);
 
             IDataView dataView = loader.Load(databaseSource);
-            IDataView firstWeekData = _mlContext.Data.FilterRowsByColumn(dataView, "Semaine", upperBound: weekNo);
-            IDataView nextWeekData = _mlContext.Data.FilterRowsByColumn(dataView, "Semaine", lowerBound: weekNo);
+            IDataView firstWeekData = _mlContext.Data.FilterRowsByColumn(dataView, "Jour", upperBound: 1);
+            IDataView nextWeekData = _mlContext.Data.FilterRowsByColumn(dataView, "Jour", lowerBound: 1);
 
             var forecastingPipeline = _mlContext.Forecasting.ForecastBySsa(
                 outputColumnName: "ForecastedPassants",
                 inputColumnName: "NbPassants",
-                windowSize: 4,
-                seriesLength: 7,
-                trainSize: 40314,
-                horizon: 4,
+                windowSize: 7,
+                seriesLength: 24,
+                trainSize: 10079,
+                horizon: 7,
                 confidenceLevel: 0.95f,
                 confidenceLowerBoundColumn: "LowerBoundPassants",
                 confidenceUpperBoundColumn: "UpperBoundPassants");
@@ -90,6 +87,7 @@ namespace PassantsForecasting
                     //string jour = Enum.GetName(typeof(DayOfWeek), passants.Jour);
                     float semaine = passants.Semaine;
                     float jour = passants.Jour;
+                    //DateTime horaire = passants.Horaire;
                     float actualPassants = passants.NbPassants;
                     float lowerEstimate = Math.Max(0, forecast.LowerBoundPassants[index]);
                     float estimate = forecast.ForecastedPassants[index];

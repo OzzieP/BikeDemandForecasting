@@ -7,6 +7,8 @@ namespace PassantsForecasting
     public class ModelInput
     {
         public float Semaine { get; set; }
+        
+        //public DateTime Horaire { get; set; }
 
         public float Jour { get; set; }
 
